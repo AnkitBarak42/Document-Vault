@@ -34,10 +34,10 @@ input,select{width:100%;padding:13px;border:1px solid #dce3ee;border-radius:12px
 <div id="login" class="screen on"><div class="login"><div class="loginbox">
 <div style="font-size:30px;font-weight:900">My Documents <span style="color:#2864f0">Vault</span></div>
 <p style="color:#78869d">Secure document manager</p>
-<input id="username" placeholder="Username" autocomplete="username">
-<input id="password" type="password" placeholder="Password" autocomplete="current-password">
+<input id="username" type="email" placeholder="Email" autocomplete="username">
+<input id="password" type="password" placeholder="Password (min 6 characters)" autocomplete="current-password">
 <button class="btn" onclick="login()">Login</button>
-<p style="font-size:12px;color:#78869d">Username + password • PIN disabled</p>
+<p style="font-size:12px;color:#78869d" id="loginhint">No account? Just enter an email + password and press Login — one will be created automatically.</p>
 </div></div></div>
 
 <div id="home" class="screen">
@@ -62,8 +62,8 @@ input,select{width:100%;padding:13px;border:1px solid #dce3ee;border-radius:12px
 </div></section></div>
 
 <div id="settings" class="screen"><div class="top"><button class="back" onclick="page('home')">‹</button><h1>Settings</h1></div><section class="section">
-<div class="backup" style="margin-bottom:12px"><div><b>☁️ Backup</b><small>Documents are stored locally in this prototype.</small></div></div>
-<div class="backup" style="margin-bottom:12px"><div><b>🔐 Security</b><small>Username + password • PIN disabled</small></div></div>
+<div class="backup" style="margin-bottom:12px"><div><b>☁️ Backup</b><small>Synced to Firebase Cloud • available on every device you log into</small></div></div>
+<div class="backup" style="margin-bottom:12px"><div><b>🔐 Security</b><small id="acctline">Signed in with Firebase Auth</small></div></div>
 <button class="btn danger" onclick="logout()">Logout</button>
 </section></div>
 
@@ -73,28 +73,121 @@ input,select{width:100%;padding:13px;border:1px solid #dce3ee;border-radius:12px
 </div>
 
 <script>
-const DB='MyDocumentsVaultDB', STORE='documents';
+/* ====================== FIREBASE SETUP ======================
+   1. Go to https://console.firebase.google.com -> Add project (free).
+   2. Project Settings -> General -> "Your apps" -> Web app (</>) -> copy the config below.
+   3. Build > Authentication -> Sign-in method -> enable "Email/Password".
+   4. Build > Firestore Database -> Create database (start in production mode is fine).
+   5. Build > Storage -> Get started (accept default rules to start).
+   6. Paste your config into firebaseConfig below, replacing the placeholders.
+   7. (Recommended) Firestore & Storage rules so users only see their own files:
+      Firestore rules:
+        match /users/{uid}/documents/{docId} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+      Storage rules:
+        match /users/{uid}/{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+================================================================= */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+let auth, db, storage, fb, currentUser=null, unsubDocs=null;
 let docs=[];
+
 function toast(t){let e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2200)}
-function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id',autoIncrement:true});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function getDocs(){let db=await openDB();return new Promise((res,rej)=>{let r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function putDoc(d){let db=await openDB();return new Promise((res,rej)=>{let r=db.transaction(STORE,'readwrite').objectStore(STORE).add(d);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
-async function delDoc(id){let db=await openDB();db.transaction(STORE,'readwrite').objectStore(STORE).delete(id);load()}
-async function load(){docs=await getDocs();renderHome();renderDocs()}
-function login(){if(!username.value.trim()||!password.value)return toast('Username and password required');localStorage.setItem('logged','1');showLogged()}
+
+async function initFirebase(){
+  if(firebaseConfig.apiKey==='YOUR_API_KEY'){
+    toast('⚠️ Add your Firebase config in the script to enable login');
+    return;
+  }
+  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+  const authMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+  const fsMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+  const stMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js');
+  const app = initializeApp(firebaseConfig);
+  auth = authMod.getAuth(app);
+  db = fsMod.getFirestore(app);
+  storage = stMod.getStorage(app);
+  fb = {...authMod, ...fsMod, ...stMod};
+
+  fb.onAuthStateChanged(auth, user=>{
+    currentUser = user;
+    if(user){
+      let el=document.getElementById('acctline'); if(el) el.textContent='Signed in as '+user.email;
+      showLogged();
+      listenDocs();
+    } else {
+      if(unsubDocs){unsubDocs();unsubDocs=null}
+      docs=[];
+      document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));
+      document.getElementById('login').classList.add('on');
+    }
+  });
+}
+
+async function login(){
+  if(!auth) return toast('⚠️ Firebase not configured yet');
+  let email=username.value.trim(), pass=password.value;
+  if(!email||!pass) return toast('Email and password required');
+  if(pass.length<6) return toast('Password must be at least 6 characters');
+  try{
+    await fb.signInWithEmailAndPassword(auth, email, pass);
+  }catch(e){
+    if(e.code==='auth/user-not-found' || e.code==='auth/invalid-credential'){
+      try{
+        await fb.createUserWithEmailAndPassword(auth, email, pass);
+        toast('Account created — welcome!');
+      }catch(e2){ toast(e2.message) }
+    } else {
+      toast(e.message);
+    }
+  }
+}
 function showLogged(){document.getElementById('login').classList.remove('on');page('home')}
-function logout(){localStorage.removeItem('logged');document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));document.getElementById('login').classList.add('on')}
-function page(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));document.getElementById(id).classList.add('on');load()}
+async function logout(){await fb.signOut(auth)}
+function page(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));document.getElementById(id).classList.add('on');renderHome();renderDocs()}
+
+function listenDocs(){
+  if(unsubDocs) unsubDocs();
+  let colRef = fb.collection(db,'users',currentUser.uid,'documents');
+  unsubDocs = fb.onSnapshot(colRef, snap=>{
+    docs = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderHome(); renderDocs();
+  }, err=>{ toast('Sync error: '+err.message) });
+}
+
+async function putDoc(d){
+  let id = (crypto.randomUUID?crypto.randomUUID():(''+Date.now()+Math.random()));
+  toast('Uploading...');
+  let fileRef = fb.ref(storage, `users/${currentUser.uid}/${id}`);
+  await fb.uploadBytes(fileRef, d.blob);
+  let url = await fb.getDownloadURL(fileRef);
+  await fb.setDoc(fb.doc(db,'users',currentUser.uid,'documents',id), {
+    name:d.name, category:d.category||'Other', type:d.type, ico:d.ico, size:d.size||0, url,
+    createdAt: fb.serverTimestamp()
+  });
+}
+async function delDoc(id){
+  try{
+    await fb.deleteDoc(fb.doc(db,'users',currentUser.uid,'documents',id));
+    await fb.deleteObject(fb.ref(storage, `users/${currentUser.uid}/${id}`)).catch(()=>{});
+  }catch(e){ toast(e.message) }
+}
 function fmt(n){if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(1)+' KB';return (n/1048576).toFixed(1)+' MB'}
-function card(x){return `<div class="doc" onclick="openDoc(${x.id})"><div class="ico">${x.ico||'📄'}</div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.type||'Document')}</small></div>`}
+function card(x){return `<div class="doc" onclick="openDoc('${x.id}')"><div class="ico">${x.ico||'📄'}</div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.type||'Document')}</small></div>`}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function renderHome(){let q=(document.getElementById('q')?.value||'').toLowerCase();let a=docs.filter(x=>x.name.toLowerCase().includes(q));document.getElementById('important').innerHTML=a.slice(0,4).map(card).join('')||'<div style="color:#78869d;padding:12px">No documents yet.</div>';document.getElementById('count').textContent=docs.length;document.getElementById('storage').textContent=fmt(docs.reduce((s,x)=>s+(x.size||0),0))}
-function renderDocs(){let q=(document.getElementById('dq')?.value||'').toLowerCase();let a=docs.filter(x=>(x.name+' '+x.category).toLowerCase().includes(q));let l=document.getElementById('list');if(l)l.innerHTML=a.map(x=>`<div class="row" onclick="openDoc(${x.id})"><div class="ri">${x.ico||'📄'}</div><div style="flex:1"><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.category||'Other')} • ${escapeHtml(x.type||'Document')}</small></div>🗑️</div>`).join('')||'<p style="color:#78869d">No documents found.</p>'}
+function renderDocs(){let q=(document.getElementById('dq')?.value||'').toLowerCase();let a=docs.filter(x=>(x.name+' '+x.category).toLowerCase().includes(q));let l=document.getElementById('list');if(l)l.innerHTML=a.map(x=>`<div class="row" onclick="openDoc('${x.id}')"><div class="ri">${x.ico||'📄'}</div><div style="flex:1"><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.category||'Other')} • ${escapeHtml(x.type||'Document')}</small></div>🗑️</div>`).join('')||'<p style="color:#78869d">No documents found.</p>'}
 function category(c){page('documents');setTimeout(()=>{dq.value=c;renderDocs()},50)}
 function addDocument(){document.getElementById('mt').textContent='Add Document';document.getElementById('mb').innerHTML='<div class="choice" onclick="pickUpload()">📄 <div><b>Upload Document</b><small>PDF, JPG, PNG</small></div></div><div class="choice" onclick="tool(\'scan\')">📷 <div><b>Scan Document</b><small>Camera से scan करके PDF</small></div></div>';document.getElementById('modal').style.display='flex'}
-function pickUpload(){closeModal();let i=document.createElement('input');i.type='file';i.accept='.pdf,image/*';i.onchange=async()=>{let f=i.files[0];if(!f)return;let name=prompt('Document name',f.name.replace(/\.[^.]+$/,''));if(!name)return;await putDoc({name,category:'Other',type:f.type==='application/pdf'?'PDF':'Image',ico:f.type==='application/pdf'?'📄':'🖼️',size:f.size,blob:f});toast('Document saved');load()};i.click()}
-async function openDoc(id){let x=docs.find(d=>d.id===id);if(!x)return;document.getElementById('mt').textContent=x.name;document.getElementById('mb').innerHTML=`<div class="choice" onclick="downloadDoc(${id})">⬇️ <div><b>Open / Save</b><small>${fmt(x.size||0)}</small></div></div><div class="choice" onclick="delDoc(${id});closeModal()">🗑️ <div><b>Delete</b><small>Remove from vault</small></div></div>`;document.getElementById('modal').style.display='flex'}
-async function downloadDoc(id){let x=docs.find(d=>d.id===id);if(!x?.blob)return toast('No file attached');let a=document.createElement('a');a.href=URL.createObjectURL(x.blob);a.download=x.name+(x.blob.type==='application/pdf'?'.pdf':'.jpg');a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function pickUpload(){closeModal();let i=document.createElement('input');i.type='file';i.accept='.pdf,image/*';i.onchange=async()=>{let f=i.files[0];if(!f)return;let name=prompt('Document name',f.name.replace(/\.[^.]+$/,''));if(!name)return;await putDoc({name,category:'Other',type:f.type==='application/pdf'?'PDF':'Image',ico:f.type==='application/pdf'?'📄':'🖼️',size:f.size,blob:f});toast('Document saved')};i.click()}
+async function openDoc(id){let x=docs.find(d=>d.id===id);if(!x)return;document.getElementById('mt').textContent=x.name;document.getElementById('mb').innerHTML=`<div class="choice" onclick="downloadDoc('${id}')">⬇️ <div><b>Open / Save</b><small>${fmt(x.size||0)}</small></div></div><div class="choice" onclick="delDoc('${id}');closeModal()">🗑️ <div><b>Delete</b><small>Remove from vault</small></div></div>`;document.getElementById('modal').style.display='flex'}
+async function downloadDoc(id){let x=docs.find(d=>d.id===id);if(!x?.url)return toast('No file attached');let a=document.createElement('a');a.href=x.url;a.target='_blank';a.rel='noopener';a.click()}
 function tool(type){let title={jpgpdf:'JPG → PDF',pdfjpg:'PDF → JPG',compress:'Compress',merge:'Merge PDF',split:'Split PDF',scan:'Scan → PDF'}[type];document.getElementById('mt').textContent=title;document.getElementById('mb').innerHTML=toolUI(type);document.getElementById('modal').style.display='flex'}
 function toolUI(t){if(t==='jpgpdf')return '<input id="files" type="file" accept="image/*" multiple><button class="btn" onclick="jpgToPdf()">Convert to PDF</button>';
 if(t==='pdfjpg')return '<input id="files" type="file" accept=".pdf"><button class="btn" onclick="pdfToJpg()">Convert to JPG</button>';
@@ -110,5 +203,5 @@ async function compressImage(){let f=document.getElementById('files').files[0];i
 async function mergePdf(){let fs=[...document.getElementById('files').files];if(fs.length<2)return toast('Select at least 2 PDFs');let out=await PDFLib.PDFDocument.create();for(let f of fs){let src=await PDFLib.PDFDocument.load(await f.arrayBuffer());let pages=await out.copyPages(src,src.getPageIndices());pages.forEach(p=>out.addPage(p))}downloadBlob(new Blob([await out.save()],{type:'application/pdf'}),'merged.pdf');toast('PDFs merged')}
 async function splitPdf(){let f=document.getElementById('files').files[0],nums=document.getElementById('pages').value.split(',').map(x=>parseInt(x.trim())).filter(Boolean);if(!f||!nums.length)return toast('Select PDF and pages');let src=await PDFLib.PDFDocument.load(await f.arrayBuffer()),out=await PDFLib.PDFDocument.create();let pages=await out.copyPages(src,nums.map(n=>n-1).filter(n=>n>=0&&n<src.getPageCount()));pages.forEach(p=>out.addPage(p));downloadBlob(new Blob([await out.save()],{type:'application/pdf'}),'split.pdf');toast('Split PDF ready')}
 function closeModal(e){if(!e||e.target.id==='modal')document.getElementById('modal').style.display='none'}
-(async()=>{if(localStorage.getItem('logged')==='1')showLogged();else{document.getElementById('login').classList.add('on')}await load()})();
+initFirebase();
 </script></body></html>
