@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>My Documents Vault</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<style>
+:root{--blue:#2864f0;--bg:#f5f7fb;--ink:#18233d;--muted:#78869d}
+*{box-sizing:border-box}body{margin:0;background:#e8edf5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink)}
+.app{max-width:430px;margin:auto;min-height:100vh;background:var(--bg);position:relative}.screen{display:none;min-height:100vh;padding-bottom:90px}.screen.on{display:block}
+.header{padding:28px 20px 15px;display:flex;justify-content:space-between;align-items:center}.brand{font-size:27px;font-weight:900;letter-spacing:-.8px}.hello{font-size:14px;color:var(--muted);font-weight:700;margin-top:4px}
+.iconbtn,.back{border:0;background:#fff;width:46px;height:46px;border-radius:15px;box-shadow:0 8px 22px #17213a12;font-size:20px}.top{display:flex;align-items:center;gap:12px;padding:24px 20px 10px}.top h1{font-size:22px;margin:0}
+.search{height:56px;background:#fff;border:1px solid #e3e8f0;border-radius:18px;margin:0 20px 18px;display:flex;align-items:center;padding:0 15px;box-shadow:0 6px 18px #17213a08}.search input{border:0;outline:0;flex:1;margin-left:10px;font-size:16px;background:transparent}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 20px 23px}.stat{background:#fff;border-radius:20px;padding:18px;box-shadow:0 7px 20px #17213a09}.stat strong{font-size:29px}.stat small{display:block;color:var(--muted);font-weight:700;margin-top:4px}
+.section{margin:0 20px 24px}.sectitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.sectitle h2{font-size:19px;margin:0}.view{font-size:13px;color:var(--blue);font-weight:800}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.doc,.cat,.tool,.row,.backup{background:#fff;border:1px solid #e8ecf2;border-radius:18px;box-shadow:0 7px 20px #17213a08}.doc{padding:16px;min-height:135px}.doc .ico{font-size:26px}.doc b{display:block;margin-top:15px;font-size:15px}.doc small,.tool small,.row small{display:block;color:var(--muted);font-weight:650;margin-top:5px}
+.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.cat{padding:13px 7px;text-align:center}.cat .ico{font-size:24px}.cat b{font-size:11px;display:block;margin-top:6px}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.tool{padding:13px 7px;text-align:center;min-height:92px;cursor:pointer}.tool .ico{font-size:23px}.tool b{font-size:11px;display:block;margin-top:7px}
+.backup{padding:15px;display:flex;align-items:center;gap:12px}.backup b{font-size:13px}.backup small{display:block;color:var(--muted);margin-top:3px}
+.add{position:fixed;bottom:65px;left:50%;transform:translateX(-50%);width:min(390px,calc(100% - 38px));height:55px;border:0;border-radius:17px;background:var(--blue);color:#fff;font-size:17px;font-weight:900;box-shadow:0 12px 30px #2864f04d;z-index:8}
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(430px,100%);height:64px;background:#fff;border-top:1px solid #e4e9f1;display:flex;justify-content:space-around;align-items:center;z-index:9}.nav button{border:0;background:none;color:#8490a4;font-size:10px;font-weight:750}.nav button b{display:block;font-size:19px;margin-bottom:2px}.nav .on{color:var(--blue)}.plus{width:48px;height:48px;border-radius:50%!important;background:var(--blue)!important;color:#fff!important;font-size:25px!important}
+.list{margin:0 20px}.row{padding:14px;display:flex;align-items:center;gap:13px;margin-bottom:10px}.row .ri{font-size:25px}
+.sheetbg{position:fixed;inset:0;background:#16213b66;display:none;align-items:flex-end;z-index:20}.sheet{background:#fff;width:min(430px,100%);margin:auto;border-radius:25px 25px 0 0;padding:20px;max-height:85vh;overflow:auto}.sheet h2{margin:0 0 15px}.choice{padding:15px 5px;border-bottom:1px solid #edf0f5;display:flex;gap:14px;align-items:center;cursor:pointer}.choice b{font-size:14px}.choice small{display:block;color:var(--muted);margin-top:3px}
+input,select{width:100%;padding:13px;border:1px solid #dce3ee;border-radius:12px;margin:6px 0;font-size:15px}.btn{width:100%;border:0;background:var(--blue);color:white;padding:14px;border-radius:13px;font-weight:850;margin-top:8px}.danger{background:#e5484d}
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}.loginbox{width:100%;background:#fff;border-radius:28px;padding:28px;box-shadow:0 20px 60px #17213a18}.loginbox h1{margin:0;font-size:28px}
+.toast{position:fixed;left:50%;bottom:130px;transform:translateX(-50%);background:#18233d;color:white;padding:12px 18px;border-radius:13px;display:none;z-index:50;font-size:13px}
+</style>
+</head>
+<body><div class="app">
+
+<div id="login" class="screen on"><div class="login"><div class="loginbox">
+<div style="font-size:30px;font-weight:900">My Documents <span style="color:#2864f0">Vault</span></div>
+<p style="color:#78869d">Secure document manager</p>
+<input id="username" placeholder="Username" autocomplete="username">
+<input id="password" type="password" placeholder="Password" autocomplete="current-password">
+<button class="btn" onclick="login()">Login</button>
+<p style="font-size:12px;color:#78869d">Username + password • PIN disabled</p>
+</div></div></div>
+
+<div id="home" class="screen">
+<header class="header"><div><div class="brand">My Documents Vault</div><div class="hello">Good Evening 👋</div></div><button class="iconbtn" onclick="page('settings')">⚙️</button></header>
+<div class="search">🔎<input id="q" placeholder="Search documents..." oninput="renderHome()"></div>
+<div class="stats"><div class="stat"><strong id="count">0</strong><small>Documents</small></div><div class="stat"><strong id="storage">0 KB</strong><small>Storage</small></div></div>
+<section class="section"><div class="sectitle"><h2>⭐ Important Documents</h2><span class="view" onclick="page('documents')">View all</span></div><div id="important" class="grid2"></div></section>
+<section class="section"><div class="sectitle"><h2>Categories</h2><span class="view" onclick="page('documents')">View all</span></div><div class="cats">
+<div class="cat" onclick="category('Identity')"><div class="ico">🪪</div><b>Identity</b></div><div class="cat" onclick="category('Education')"><div class="ico">🎓</div><b>Education</b></div><div class="cat" onclick="category('Official')"><div class="ico">🏢</div><b>Official</b></div><div class="cat" onclick="category('Finance')"><div class="ico">🏦</div><b>Finance</b></div><div class="cat" onclick="category('Vehicle')"><div class="ico">🚗</div><b>Vehicle</b></div><div class="cat" onclick="category('Family')"><div class="ico">👨‍👩‍👦</div><b>Family</b></div>
+</div></section>
+<section class="section"><div class="sectitle"><h2>🛠 Document Tools</h2><span class="view" onclick="page('tools')">View all</span></div><div class="tools">
+<div class="tool" onclick="tool('jpgpdf')"><div class="ico">🖼️</div><b>JPG → PDF</b></div><div class="tool" onclick="tool('pdfjpg')"><div class="ico">📄</div><b>PDF → JPG</b></div><div class="tool" onclick="tool('compress')"><div class="ico">📦</div><b>Compress</b></div><div class="tool" onclick="tool('merge')"><div class="ico">🔗</div><b>Merge PDF</b></div><div class="tool" onclick="tool('split')"><div class="ico">✂️</div><b>Split PDF</b></div><div class="tool" onclick="tool('scan')"><div class="ico">📷</div><b>Scan → PDF</b></div>
+</div></section>
+<section class="section"><div class="backup"><span style="font-size:26px">☁️</span><div><b>Backup</b><small>Local document vault ready • Firebase can be connected</small></div></div></section>
+<button class="add" onclick="addDocument()">＋ Add Document</button>
+</div>
+
+<div id="documents" class="screen"><div class="top"><button class="back" onclick="page('home')">‹</button><h1>All Documents</h1></div><div class="search">🔎<input id="dq" placeholder="Search documents..." oninput="renderDocs()"></div><div class="list" id="list"></div></div>
+
+<div id="tools" class="screen"><div class="top"><button class="back" onclick="page('home')">‹</button><h1>Document Tools</h1></div><section class="section"><div class="tools">
+<div class="tool" onclick="tool('jpgpdf')"><div class="ico">🖼️</div><b>JPG → PDF</b></div><div class="tool" onclick="tool('pdfjpg')"><div class="ico">📄</div><b>PDF → JPG</b></div><div class="tool" onclick="tool('compress')"><div class="ico">📦</div><b>Compress</b></div><div class="tool" onclick="tool('merge')"><div class="ico">🔗</div><b>Merge PDF</b></div><div class="tool" onclick="tool('split')"><div class="ico">✂️</div><b>Split PDF</b></div><div class="tool" onclick="tool('scan')"><div class="ico">📷</div><b>Scan → PDF</b></div>
+</div></section></div>
+
+<div id="settings" class="screen"><div class="top"><button class="back" onclick="page('home')">‹</button><h1>Settings</h1></div><section class="section">
+<div class="backup" style="margin-bottom:12px"><div><b>☁️ Backup</b><small>Documents are stored locally in this prototype.</small></div></div>
+<div class="backup" style="margin-bottom:12px"><div><b>🔐 Security</b><small>Username + password • PIN disabled</small></div></div>
+<button class="btn danger" onclick="logout()">Logout</button>
+</section></div>
+
+<nav class="nav"><button onclick="page('home')"><b>⌂</b>Home</button><button onclick="page('documents')"><b>▣</b>Documents</button><button class="plus" onclick="addDocument()">＋</button><button onclick="page('tools')"><b>🛠</b>Tools</button><button onclick="page('settings')"><b>⚙</b>Settings</button></nav>
+<div id="modal" class="sheetbg" onclick="closeModal(event)"><div class="sheet" onclick="event.stopPropagation()"><h2 id="mt">Add Document</h2><div id="mb"></div></div></div>
+<div id="toast" class="toast"></div>
+</div>
+
+<script>
+const DB='MyDocumentsVaultDB', STORE='documents';
+let docs=[];
+function toast(t){let e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2200)}
+function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id',autoIncrement:true});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function getDocs(){let db=await openDB();return new Promise((res,rej)=>{let r=db.transaction(STORE).objectStore(STORE).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function putDoc(d){let db=await openDB();return new Promise((res,rej)=>{let r=db.transaction(STORE,'readwrite').objectStore(STORE).add(d);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function delDoc(id){let db=await openDB();db.transaction(STORE,'readwrite').objectStore(STORE).delete(id);load()}
+async function load(){docs=await getDocs();renderHome();renderDocs()}
+function login(){if(!username.value.trim()||!password.value)return toast('Username and password required');localStorage.setItem('logged','1');showLogged()}
+function showLogged(){document.getElementById('login').classList.remove('on');page('home')}
+function logout(){localStorage.removeItem('logged');document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));document.getElementById('login').classList.add('on')}
+function page(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('on'));document.getElementById(id).classList.add('on');load()}
+function fmt(n){if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(1)+' KB';return (n/1048576).toFixed(1)+' MB'}
+function card(x){return `<div class="doc" onclick="openDoc(${x.id})"><div class="ico">${x.ico||'📄'}</div><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.type||'Document')}</small></div>`}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function renderHome(){let q=(document.getElementById('q')?.value||'').toLowerCase();let a=docs.filter(x=>x.name.toLowerCase().includes(q));document.getElementById('important').innerHTML=a.slice(0,4).map(card).join('')||'<div style="color:#78869d;padding:12px">No documents yet.</div>';document.getElementById('count').textContent=docs.length;document.getElementById('storage').textContent=fmt(docs.reduce((s,x)=>s+(x.size||0),0))}
+function renderDocs(){let q=(document.getElementById('dq')?.value||'').toLowerCase();let a=docs.filter(x=>(x.name+' '+x.category).toLowerCase().includes(q));let l=document.getElementById('list');if(l)l.innerHTML=a.map(x=>`<div class="row" onclick="openDoc(${x.id})"><div class="ri">${x.ico||'📄'}</div><div style="flex:1"><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.category||'Other')} • ${escapeHtml(x.type||'Document')}</small></div>🗑️</div>`).join('')||'<p style="color:#78869d">No documents found.</p>'}
+function category(c){page('documents');setTimeout(()=>{dq.value=c;renderDocs()},50)}
+function addDocument(){document.getElementById('mt').textContent='Add Document';document.getElementById('mb').innerHTML='<div class="choice" onclick="pickUpload()">📄 <div><b>Upload Document</b><small>PDF, JPG, PNG</small></div></div><div class="choice" onclick="tool(\\'scan\\')">📷 <div><b>Scan Document</b><small>Camera से scan करके PDF</small></div></div>';document.getElementById('modal').style.display='flex'}
+function pickUpload(){closeModal();let i=document.createElement('input');i.type='file';i.accept='.pdf,image/*';i.onchange=async()=>{let f=i.files[0];if(!f)return;let name=prompt('Document name',f.name.replace(/\\.[^.]+$/,''));if(!name)return;await putDoc({name,category:'Other',type:f.type==='application/pdf'?'PDF':'Image',ico:f.type==='application/pdf'?'📄':'🖼️',size:f.size,blob:f});toast('Document saved');load()};i.click()}
+async function openDoc(id){let x=docs.find(d=>d.id===id);if(!x)return;document.getElementById('mt').textContent=x.name;document.getElementById('mb').innerHTML=`<div class="choice" onclick="downloadDoc(${id})">⬇️ <div><b>Open / Save</b><small>${fmt(x.size||0)}</small></div></div><div class="choice" onclick="delDoc(${id});closeModal()">🗑️ <div><b>Delete</b><small>Remove from vault</small></div></div>`;document.getElementById('modal').style.display='flex'}
+async function downloadDoc(id){let x=docs.find(d=>d.id===id);if(!x?.blob)return toast('No file attached');let a=document.createElement('a');a.href=URL.createObjectURL(x.blob);a.download=x.name+(x.blob.type==='application/pdf'?'.pdf':'.jpg');a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function tool(type){let title={jpgpdf:'JPG → PDF',pdfjpg:'PDF → JPG',compress:'Compress',merge:'Merge PDF',split:'Split PDF',scan:'Scan → PDF'}[type];document.getElementById('mt').textContent=title;document.getElementById('mb').innerHTML=toolUI(type);document.getElementById('modal').style.display='flex'}
+function toolUI(t){if(t==='jpgpdf')return '<input id="files" type="file" accept="image/*" multiple><button class="btn" onclick="jpgToPdf()">Convert to PDF</button>';
+if(t==='pdfjpg')return '<input id="files" type="file" accept=".pdf"><button class="btn" onclick="pdfToJpg()">Convert to JPG</button>';
+if(t==='compress')return '<input id="files" type="file" accept="image/*"><select id="quality"><option value=".8">High quality</option><option value=".6">Medium</option><option value=".4">Small size</option></select><button class="btn" onclick="compressImage()">Compress & Save</button>';
+if(t==='merge')return '<input id="files" type="file" accept=".pdf" multiple><button class="btn" onclick="mergePdf()">Merge PDFs</button>';
+if(t==='split')return '<input id="files" type="file" accept=".pdf"><input id="pages" placeholder="Pages e.g. 1,3,5"><button class="btn" onclick="splitPdf()">Create Selected Pages</button>';
+return '<input id="scanfile" type="file" accept="image/*" capture="environment"><button class="btn" onclick="scanToPdf()">Scan Image → PDF</button>'}
+async function downloadBlob(blob,name){let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+async function jpgToPdf(){let fs=[...document.getElementById('files').files];if(!fs.length)return toast('Select images');let {jsPDF}=window.jspdf;let pdf;for(let i=0;i<fs.length;i++){let url=URL.createObjectURL(fs[i]);let im=new Image();await new Promise(r=>{im.onload=r;im.src=url});let w=im.width,h=im.height,land=w>h;pdf?pdf.addPage([land?297:210,land?210:297],land?'l':'p'):pdf=new jsPDF({orientation:land?'l':'p',unit:'mm',format:'a4'});let ratio=Math.min((land?277:190)/w,(land?190:277)/h);pdf.addImage(im,'JPEG',(land?10:10),(land?10:10),w*ratio,h*ratio);URL.revokeObjectURL(url)}let blob=pdf.output('blob');downloadBlob(blob,'converted.pdf');toast('PDF created')}
+async function scanToPdf(){let f=document.getElementById('scanfile').files[0];if(!f)return toast('Take/select a photo');document.getElementById('files')?.remove();let {jsPDF}=window.jspdf;let pdf=new jsPDF('p','mm','a4');let url=URL.createObjectURL(f),im=new Image();await new Promise(r=>{im.onload=r;im.src=url});let ratio=Math.min(190/im.width,277/im.height);pdf.addImage(im,'JPEG',10,10,im.width*ratio,im.height*ratio);downloadBlob(pdf.output('blob'),'scanned.pdf');URL.revokeObjectURL(url);toast('Scan converted to PDF')}
+async function pdfToJpg(){let f=document.getElementById('files').files[0];if(!f)return toast('Select PDF');let pdfjs=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';let pdf=await pdfjs.getDocument({data:await f.arrayBuffer()}).promise;for(let n=1;n<=pdf.numPages;n++){let p=await pdf.getPage(n),v=p.getViewport({scale:1.5}),c=document.createElement('canvas');c.width=v.width;c.height=v.height;await p.render({canvasContext:c.getContext('2d'),viewport:v}).promise;await new Promise(r=>c.toBlob(b=>{downloadBlob(b,`page-${n}.jpg`);r()},'image/jpeg',.9))}toast('JPG pages created')}
+async function compressImage(){let f=document.getElementById('files').files[0];if(!f)return toast('Select image');let q=+document.getElementById('quality').value,url=URL.createObjectURL(f),im=new Image();await new Promise(r=>{im.onload=r;im.src=url});let c=document.createElement('canvas'),max=1800,s=Math.min(1,max/Math.max(im.width,im.height));c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);c.toBlob(b=>{downloadBlob(b,'compressed.jpg');toast('Compressed image ready')},'image/jpeg',q);URL.revokeObjectURL(url)}
+async function mergePdf(){let fs=[...document.getElementById('files').files];if(fs.length<2)return toast('Select at least 2 PDFs');let out=await PDFLib.PDFDocument.create();for(let f of fs){let src=await PDFLib.PDFDocument.load(await f.arrayBuffer());let pages=await out.copyPages(src,src.getPageIndices());pages.forEach(p=>out.addPage(p))}downloadBlob(new Blob([await out.save()],{type:'application/pdf'}),'merged.pdf');toast('PDFs merged')}
+async function splitPdf(){let f=document.getElementById('files').files[0],nums=document.getElementById('pages').value.split(',').map(x=>parseInt(x.trim())).filter(Boolean);if(!f||!nums.length)return toast('Select PDF and pages');let src=await PDFLib.PDFDocument.load(await f.arrayBuffer()),out=await PDFLib.PDFDocument.create();let pages=await out.copyPages(src,nums.map(n=>n-1).filter(n=>n>=0&&n<src.getPageCount()));pages.forEach(p=>out.addPage(p));downloadBlob(new Blob([await out.save()],{type:'application/pdf'}),'split.pdf');toast('Split PDF ready')}
+function closeModal(e){if(!e||e.target.id==='modal')document.getElementById('modal').style.display='none'}
+(async()=>{if(localStorage.getItem('logged')==='1')showLogged();else{document.getElementById('login').classList.add('on')}await load()})();
+</script></body></html>
